@@ -1,0 +1,6 @@
+
+local_test/ml_vol/
+
+venv/
+docker-compose.yaml
+build_and_push.sh
