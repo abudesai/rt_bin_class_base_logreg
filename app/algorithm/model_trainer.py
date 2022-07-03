@@ -26,22 +26,14 @@ def get_trained_model(data, data_schema, hyper_params):
     utils.set_seeds()
     
     # perform train/valid split 
-    if data.shape[1] > 500:        
-        train_data, valid_data = train_test_split(data, test_size=model_cfg['valid_split'])
-    else: 
-        train_data = data
-        valid_data = None
+    train_data, valid_data = train_test_split(data, test_size=model_cfg['valid_split'])
     # print('train_data shape:',  train_data.shape, 'valid_data shape:', valid_data.shape) 
     
     # preprocess data
     print("Pre-processing data...")
     train_data, valid_data, preprocess_pipe = preprocess_data(train_data, valid_data, data_schema)       
     train_X, train_y = train_data['X'].astype(np.float), train_data['y'].astype(np.float)
-    
-    if valid_data is not None: 
-        valid_X, valid_y = valid_data['X'].astype(np.float), valid_data['y'].astype(np.float)       
-    else: 
-        valid_X, valid_y = None, None      
+    valid_X, valid_y = valid_data['X'].astype(np.float), valid_data['y'].astype(np.float)            
     
     # balance the targetclasses  
     over_sampler = RandomOverSampler(random_state=42)
@@ -71,7 +63,7 @@ def train_model(train_X, train_y, valid_X, valid_y, hyper_params):
         epochs = 1000,
         verbose = 0, 
     )  
-    print("last_loss:", history.history['loss'][-1])
+    # print("last_loss:", history.history['loss'][-1])
     return model, history
 
 
@@ -83,8 +75,7 @@ def preprocess_data(train_data, valid_data, data_schema):
     train_data = preprocess_pipe.fit_transform(train_data)
     # print("Processed train X/y data shape", train_data['X'].shape, train_data['y'].shape)
       
-    if valid_data is not None: 
-        valid_data = preprocess_pipe.transform(valid_data)
+    valid_data = preprocess_pipe.transform(valid_data)
     # print("Processed valid X/y data shape", valid_data['X'].shape, valid_data['y'].shape)
     return train_data, valid_data, preprocess_pipe 
 

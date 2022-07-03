@@ -1,5 +1,5 @@
 {
-  "MODEL_NAME": "ElasticNet",
+  "MODEL_NAME": "LogisticRegression",
   "default_fnames": {
     "def_train_fname": "train.csv",
     "def_test_fname": "test.csv",
@@ -43,6 +43,7 @@
       "ONE_HOT_ENCODER": "one_hot_encoder",
       "LABELBINARIZER": "label_binarizer",
       "FEATURE_DROPPER": "feature_dropper",
+      "VALUE_CLIPPER": "value_clipper",
       "TARGET_FEATURE_ADDER": "target_feature_adder",
       "XYSPLITTER": "xysplitter"
     }

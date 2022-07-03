@@ -1,9 +1,8 @@
 import os, shutil
 import sys
+import time
 import pandas as pd, numpy as np
-import json
 import pprint
-from skopt.space import Real, Categorical, Integer
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 
 sys.path.insert(0, './../app')
@@ -32,23 +31,15 @@ hpt_results_path = os.path.join(output_path, "hpt_outputs")
 testing_outputs_path = os.path.join(output_path, "testing_outputs")
 errors_path = os.path.join(output_path, "errors")
 
-dataset_name = "credit_card"; target_class = "negative"; other_class = "positive"; target_field = "class"
-# dataset_name = "spam"; target_class = 1; other_class = 0; target_field = "class"
-# dataset_name = "segment"; target_class = "P"; other_class = "N"; target_field = "binaryClass"
-# dataset_name = "telco_churn"; target_class = "Yes"; other_class = "No"; target_field = "Churn"
-# dataset_name = "cancer"; target_class = "M"; other_class = "B"; target_field = "diagnosis"
-
-
 '''
 this script is useful for doing the algorithm testing locally without needing 
 to build the docker image and run the container.
 make sure you create your virtual environment, install the dependencies
 from requirements.txt file, and then use that virtual env to do your testing. 
-This isnt foolproof. You can still have host os-related issues, so beware. 
+This isnt foolproof. You can still have host os, or python-version related issues, so beware.
 '''
 
-
-
+model_name = "logistic_regression"
 
 
 def create_ml_vol():    
@@ -88,8 +79,7 @@ def create_ml_vol():
     create_dir("", dir_tree)
 
 
-
-def copy_example_files():     
+def copy_example_files(dataset_name):     
     # data schema
     shutil.copyfile(f"./examples/{dataset_name}_schema.json", os.path.join(data_schema_path, f"{dataset_name}_schema.json"))
     # train data    
@@ -100,16 +90,13 @@ def copy_example_files():
     shutil.copyfile("./examples/hyperparameters.json", os.path.join(hyper_param_path, "hyperparameters.json"))
 
 
-
-def run_HPT(): 
+def run_HPT(num_hpt_trials): 
     # Read data
     train_data = utils.get_data(train_data_path)    
     # read data config
     data_schema = utils.get_data_schema(data_schema_path)  
     # run hyper-parameter tuning. This saves results in each trial, so nothing is returned
-    num_trials = 20
-    model_tuner.tune_hyperparameters(train_data, data_schema, num_trials, hyper_param_path, hpt_results_path)
-
+    model_tuner.tune_hyperparameters(train_data, data_schema, num_hpt_trials, hyper_param_path, hpt_results_path)
 
 
 def train_and_save_algo():        
@@ -130,7 +117,6 @@ def train_and_save_algo():
     print("done with training")
 
 
-
 def load_and_test_algo(): 
     # Read data
     test_data = utils.get_data(test_data_path)   
@@ -143,40 +129,103 @@ def load_and_test_algo():
     # save predictions
     predictions.to_csv(os.path.join(testing_outputs_path, "test_predictions.csv"), index=False)
     # score the results
-    score(test_data, predictions)  
+    results = score(test_data, predictions)  
     print("done with predictions")
+    return results
 
+
+def set_scoring_vars(dataset_name):
+    global target_class, other_class, target_field
+    if dataset_name == "cancer": 
+        target_class = "M"; other_class = "B"; target_field = "diagnosis"
+    elif dataset_name == "credit_card": 
+        target_class = "negative"; other_class = "positive"; target_field = "class"
+    elif dataset_name == "mushroom": 
+        target_class = "p"; other_class = "e"; target_field = "class"
+    elif dataset_name == "segment": 
+        target_class = "P"; other_class = "N"; target_field = "binaryClass"
+    elif dataset_name == "spam": 
+        target_class = 1; other_class = 0; target_field = "class"
+    elif dataset_name == "telco_churn": 
+        target_class = "Yes"; other_class = "No"; target_field = "Churn"
+    elif dataset_name == "titanic": 
+        target_class = 1; other_class = 0; target_field = "Survived"
+    else: raise Exception(f"Error: Cannot find dataset = {dataset_name}")
 
 
 def score(test_data, predictions): 
     predictions["pred_class"] = predictions.apply(lambda row: 
         target_class if row[target_class] >= 0.5 else other_class, axis=1)    
     
-    accu = accuracy_score(test_data[target_field], predictions['pred_class'])
-    print(f"test accu: {accu}")
-    
-    f1 = f1_score(test_data[target_field], predictions['pred_class'], pos_label=target_class)
-    print(f"f1_score: {f1}")    
-    
-    precision = precision_score(test_data[target_field], predictions['pred_class'], pos_label=target_class)
-    print(f"precision_score: {precision}")    
-    
-    recall = recall_score(test_data[target_field], predictions['pred_class'], pos_label=target_class)
-    print(f"recall_score: {recall}")    
-    
+    accu = accuracy_score(test_data[target_field], predictions['pred_class'])    
+    f1 = f1_score(test_data[target_field], predictions['pred_class'], pos_label=target_class)    
+    precision = precision_score(test_data[target_field], predictions['pred_class'], pos_label=target_class)    
+    recall = recall_score(test_data[target_field], predictions['pred_class'], pos_label=target_class)    
     y_true = np.where(test_data[target_field] == target_class, 1., 0.)
-    auc = roc_auc_score(y_true, predictions[target_class])
-    print(f"auc_score: {auc}")
+    auc_score = roc_auc_score(y_true, predictions[target_class])
+    
+    results = { 
+               "accuracy": np.round(accu,4), 
+               "f1_score": np.round(f1, 4), 
+               "precision": np.round(precision, 4), 
+               "recall": np.round(recall, 4), 
+               "auc_score": np.round(auc_score, 4), 
+               }
+    return results
 
 
+def save_test_outputs(results, run_hpt):
+    fname = f"{model_name}_results_with_hpt.csv" if run_hpt else f"{model_name}_results_no_hpt.csv"
+    df = pd.DataFrame(results)
+    df = df[["model", "dataset_name", "run_hpt", "num_hpt_trials", 
+             "accuracy", "f1_score", "precision", "recall", "auc_score",
+             "elapsed_time_in_minutes"]]
+    print(df)
+    test_results_path = "test_results"
+    if not os.path.exists(test_results_path): os.mkdir(test_results_path)
+    df.to_csv(os.path.join(test_results_path, fname), index=False)
+
+
+def run_train_and_test(dataset_name, run_hpt, num_hpt_trials):
+    start = time.time()
+    
+    create_ml_vol()   # create the directory which imitates the bind mount on container
+    copy_example_files(dataset_name)   # copy the required files for model training    
+    if run_hpt: run_HPT(num_hpt_trials)               # run HPT and save tuned hyperparameters
+    train_and_save_algo()        # train the model and save
+    
+    set_scoring_vars(dataset_name=dataset_name)
+    results = load_and_test_algo()        # load the trained model and get predictions on test data
+    
+    end = time.time()
+    elapsed_time_in_minutes = np.round((end - start)/60.0, 2)
+    
+    results = { **results, 
+               "model": model_name, 
+               "dataset_name": dataset_name, 
+               "run_hpt": run_hpt, 
+               "num_hpt_trials": num_hpt_trials if run_hpt else None, 
+               "elapsed_time_in_minutes": elapsed_time_in_minutes 
+               }
+    
+    print(f"Done with dataset in {elapsed_time_in_minutes} minutes.")
+    return results
 
 
 if __name__ == "__main__": 
-    create_ml_vol()   # create the directory which imitates the bind mount on container
-    copy_example_files()   # copy the required files for model training   
-    # run_HPT()                   # run hyperparameter tuning and save best tuned hyperparameters
-    train_and_save_algo()        # train the model and save
-    load_and_test_algo()        # load the trained model and get predictions on test data
     
+    run_hpt = True
+    num_hpt_trials = 10
     
+    datasets = ["cancer", "credit_card", "mushroom", "segment", "spam", "telco_churn", "titanic"]
+    # datasets = ["titanic"]
     
+    all_results = []
+    for dataset_name in datasets:        
+        print("-"*60)
+        print(f"Running dataset {dataset_name}")
+        results = run_train_and_test(dataset_name, run_hpt, num_hpt_trials)
+        all_results.append(results)
+        print("-"*60)
+    
+    save_test_outputs(all_results, run_hpt)

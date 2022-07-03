@@ -2,6 +2,7 @@
 import numpy as np
 import uuid
 import time
+import math
 from skopt import gp_minimize
 from skopt.space import Real, Categorical, Integer
 from skopt.utils import use_named_args
@@ -10,6 +11,7 @@ import os
 import warnings
 import sys
 from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import RandomOverSampler
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 warnings.filterwarnings('ignore') 
@@ -99,30 +101,40 @@ def tune_hyperparameters(data, data_schema, num_trials, hyper_param_path, hpt_re
     
     # clear previous results, if any
     clear_hp_results_dir(hpt_results_path)       
-    # set random seeds
-    utils.set_seeds()   
+    
     # get the hpt space (grid) and default hps
     hpt_space = get_hpt_space(hpt_specs)  
-    default_hps = get_default_hps(hpt_specs) 
-    # perform train/valid split on the training data 
-    train_data, valid_data = train_test_split(data, test_size=model_cfg['valid_split'])    
-    train_data, valid_data, _  = model_trainer.preprocess_data(train_data, valid_data, data_schema)   
-    train_X, train_y = train_data['X'].astype(np.float), train_data['y'].astype(np.float)
-    valid_X, valid_y = valid_data['X'].astype(np.float), valid_data['y'].astype(np.float)           
+    default_hps = get_default_hps(hpt_specs)  
+             
     
     # Scikit-optimize objective function
     @use_named_args(hpt_space)
     def objective(**hyperparameters):
+                
+        # set random seeds
+        utils.set_seeds()   
+        # perform train/valid split on the training data 
+        train_data, valid_data = train_test_split(data, test_size=model_cfg['valid_split'])    
+        train_data, valid_data, _  = model_trainer.preprocess_data(train_data, valid_data, data_schema)   
+        train_X, train_y = train_data['X'].astype(np.float), train_data['y'].astype(np.float)
+        valid_X, valid_y = valid_data['X'].astype(np.float), valid_data['y'].astype(np.float) 
+        
+        # balance the target classes  
+        over_sampler = RandomOverSampler(random_state=42)
+        train_X, train_y = over_sampler.fit_resample(train_X, train_y)
+        valid_X, valid_y = over_sampler.fit_resample(valid_X, valid_y)
+        
         """Build a model from this hyper parameter permutation and evaluate its performance"""
         # train model
         model, _ = model_trainer.train_model(train_X, train_y, valid_X, valid_y, hyperparameters) 
+        
         # evaluate the model
         score = model.evaluate(valid_X, valid_y)
         # Our optimizing metric is the model loss fn
-        opt_metric = score[0]   
-        if np.isnan(opt_metric): opt_metric = 1.0e5     # sometimes loss becomes inf, so use a large value
+        opt_metric = np.round(score[0], 5)   # returns binary_cross_entropy
+        if np.isnan(opt_metric) or math.isinf(opt_metric): opt_metric = 1.0e5     # sometimes loss becomes inf, so use a large value
         # create a unique model name for the trial - we add loss into file name 
-        # so we can later sort by file names, and get the best score file without reading each file
+        # so we can later sort by file names, and get the best score file without reading each file   
         model_name = f"model_{str(opt_metric)}_{str(uuid.uuid4())[:5]}"
         print("trial model:", model_name)
         # create trial result dict
@@ -153,7 +165,6 @@ def tune_hyperparameters(data, data_schema, num_trials, hyper_param_path, hpt_re
     
     end = time.time()
     print(f"Total HPO time: {np.round((end - start)/60.0, 2)} minutes") 
-
 
 
 

@@ -64,18 +64,28 @@ def save_json(file_path_and_name, data):
     """Save json to a path (directory + filename)"""
     with open(file_path_and_name, 'w') as f:
         json.dump( data,  f, 
-                  default=lambda o: o.__dict__,
+                  default=lambda o: make_serializable(o), 
                   sort_keys=True, 
                   indent=4, 
                   separators=(',', ': ') 
                   )
+
+def make_serializable(obj): 
+    if isinstance(obj, (int, np.integer)):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    else:
+        return json.JSONEncoder.default(None, obj)
 
 
 def print_json(result):
     """Pretty-print a jsonable structure"""
     print(json.dumps(
         result,
-        default=lambda o: o.__dict__, 
+        default=lambda o: make_serializable(o), 
         sort_keys=True,
         indent=4, separators=(',', ': ')
     ))
