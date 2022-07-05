@@ -11,7 +11,6 @@ import os
 import warnings
 import sys
 from sklearn.model_selection import train_test_split
-from imblearn.over_sampling import RandomOverSampler
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
 warnings.filterwarnings('ignore') 
@@ -120,16 +119,15 @@ def tune_hyperparameters(data, data_schema, num_trials, hyper_param_path, hpt_re
         valid_X, valid_y = valid_data['X'].astype(np.float), valid_data['y'].astype(np.float) 
         
         # balance the target classes  
-        over_sampler = RandomOverSampler(random_state=42)
-        train_X, train_y = over_sampler.fit_resample(train_X, train_y)
-        valid_X, valid_y = over_sampler.fit_resample(valid_X, valid_y)
+        train_X, train_y = model_trainer.get_resampled_data(train_X, train_y)
+        valid_X, valid_y = model_trainer.get_resampled_data(valid_X, valid_y)
         
         """Build a model from this hyper parameter permutation and evaluate its performance"""
         # train model
         model, _ = model_trainer.train_model(train_X, train_y, valid_X, valid_y, hyperparameters) 
         
         # evaluate the model
-        score = model.evaluate(valid_X, valid_y)
+        score = model.evaluate(valid_X, valid_y)    # binary cross-entropy
         # Our optimizing metric is the model loss fn
         opt_metric = np.round(score[0], 5)   # returns binary_cross_entropy
         if np.isnan(opt_metric) or math.isinf(opt_metric): opt_metric = 1.0e5     # sometimes loss becomes inf, so use a large value

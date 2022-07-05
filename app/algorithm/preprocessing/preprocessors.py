@@ -131,7 +131,7 @@ class OneHotEncoderMultipleCols(BaseEstimator, TransformerMixin):
             if len(self.top_cat_by_ohe_col[col]) > 0:
                 if col in data.columns:                
                     for cat in self.top_cat_by_ohe_col[col]:
-                        col_name = col + '_' + cat
+                        col_name = col + '_' + str(cat)
                         # data[col_name] = np.where(data[col] == cat, 1, 0)
                         vals = np.where(data[col] == cat, 1, 0)
                         df = pd.DataFrame(vals, columns=[col_name])
