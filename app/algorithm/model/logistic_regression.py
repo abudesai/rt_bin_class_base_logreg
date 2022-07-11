@@ -20,7 +20,8 @@ from tensorflow.keras.losses import BinaryCrossentropy
 model_params_fname = "model_params.save"
 model_wts_fname = "model_wts.save"
 history_fname = "history.json"
-MODEL_NAME = "LogisticRegression"
+
+MODEL_NAME = "bin_class_logistic_regression"
 
 COST_THRESHOLD = float('inf')
 
@@ -29,14 +30,13 @@ class InfCostStopCallback(Callback):
     def on_epoch_end(self, epoch, logs={}):
         loss_val = logs.get('loss')
         if(loss_val == COST_THRESHOLD or tf.math.is_nan(loss_val)):
-            print("Cost is inf, so stopping training!!")
+            # print("Cost is inf, so stopping training!!")
             self.model.stop_training = True
 
 
 class LogisticRegression(): 
     
     def __init__(self, D, l1_reg=1e-3, l2_reg=1e-3, lr = 1e-2, **kwargs) -> None:
-        super(LogisticRegression, self).__init__(**kwargs)
         self.D = D
         self.l1_reg = np.float(l1_reg)
         self.l2_reg = np.float(l2_reg)
@@ -47,7 +47,7 @@ class LogisticRegression():
             loss=BinaryCrossentropy(),
             # optimizer=Adam(learning_rate=self.lr),
             optimizer=SGD(learning_rate=self.lr),
-            metrics=[BinaryCrossentropy()],
+            metrics=['accuracy'],
         )
         
         

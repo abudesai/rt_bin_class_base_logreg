@@ -92,6 +92,7 @@ def get_resampled_data(X, y):
     
     resampled_X, resampled_y = [], []
     for i, count in enumerate(class_count):
+        if count == 0: continue
         # find total num_samples to use for this class
         size = max_obs_count if max_obs_count / count < max_resample else count * max_resample
         # if observed class is 50 samples, and we need 125 samples for this class, 

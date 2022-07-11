@@ -1,5 +1,4 @@
 {
-  "MODEL_NAME": "LogisticRegression",
   "default_fnames": {
     "def_train_fname": "train.csv",
     "def_test_fname": "test.csv",

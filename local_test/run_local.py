@@ -11,7 +11,7 @@ import algorithm.model_trainer as model_trainer
 import algorithm.model_server as model_server
 import algorithm.model_tuner as model_tuner
 import algorithm.preprocessing.pipeline as pipeline
-import algorithm.model.logistic_regression as logreg 
+import algorithm.model.logistic_regression as logreg  
 
 
 inputs_path = "./ml_vol/inputs/"
@@ -42,7 +42,7 @@ from requirements.txt file, and then use that virtual env to do your testing.
 This isnt foolproof. You can still have host os, or python-version related issues, so beware.
 '''
 
-model_name = "logistic_regression"
+model_name= logreg.MODEL_NAME
 
 
 def create_ml_vol():    
